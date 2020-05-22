@@ -29,3 +29,9 @@ commands = {
     "/redis": "Gives saved content from Redis database,",
     "/instagram": "Gives content from Instagram."
 }
+
+# callback data
+FORWARD = "forward"
+FORWARD_NOW = "forward now"
+QUEUE = "queue"
+CANCEL = "cancel"
