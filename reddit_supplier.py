@@ -127,6 +127,11 @@ def get_url(submission, domain: str) -> dict:
             try:
                 og = extract_open_graph(url)
                 url = og.get("og:video")
+
+                # in cases when url is direct .gifv
+                if url is None:
+                    url = og.get("og:url").split("?")[0]
+
                 content_type = cs.GIF_TYPE
             except KeyError:
                 og = extract_open_graph(url)
@@ -209,4 +214,4 @@ def extract_open_graph(url):
 
 
 if __name__ == "__main__":
-    get_full_info("Pikabu", limit=2)
+    get_full_info("pikabu", limit=2)
