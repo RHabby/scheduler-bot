@@ -123,21 +123,21 @@ def get_url(submission, domain: str) -> dict:
             "content_type": content_type
         }
     elif domain in cs.IMGUR_DOMAIN or domain in cs.OTHER:
-        if domain == cs.IMGUR_DOMAIN[2] or content_type == cs.GIFV or domain in cs.OTHER:
+        og = extract_open_graph(url)
+        if domain == cs.IMGUR_DOMAIN[2] or domain in cs.OTHER:
             try:
-                og = extract_open_graph(url)
-                url = og.get("og:video")
-
-                # in cases when url is direct .gifv
-                if url is None:
-                    url = og.get("og:url").split("?")[0]
-
+                url = og["og:video"]
                 content_type = cs.GIF_TYPE
             except KeyError:
-                og = extract_open_graph(url)
                 url = og.get("og:image")
                 url = url.split("?")[0]
                 content_type = cs.IMG_TYPE
+
+        # in cases when url is direct .gifv
+        elif content_type == cs.GIFV:
+            url = og.get("og:url").split("?")[0]
+            content_type = cs.GIF_TYPE
+
         return {"url": url, "content_type": content_type}
     elif domain in cs.RED_DOMAIN:
         if domain == cs.RED_DOMAIN[1]:
