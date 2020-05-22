@@ -26,8 +26,8 @@ commands = {
     "/start": "Start the bot,",
     "/help": "Bot help,",
     "/reddit": "Gives content from reddit,",
-    "/redis": "Gives saved content from Redis database,",
-    "/instagram": "Gives content from Instagram."
+    "/redis": "Gives saved content from Redis database _(not implemented)_,",
+    "/instagram": "Gives content from Instagram _(not implemented)_."
 }
 
 # callback data
