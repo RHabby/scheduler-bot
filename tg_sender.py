@@ -220,10 +220,13 @@ def send_simple(
             attach = download_file(attach, source, subreddit_name)
             if submission_type == cs.IMG_TYPE:
                 try:
-                    with open(attach, "rb") as attach:
+                    with open(attach, "rb") as file:
+                        # in handling exception file doesn`t close
+                        # if attach name and "as attach" are the same
+                        # -> "seek of closed file" exception
                         bot.send_photo(
                             chat_id=where_to_post,
-                            photo=attach,
+                            photo=file,
                             caption=caption,
                             reply_markup=markup,
                             parse_mode="markdown",
@@ -231,20 +234,20 @@ def send_simple(
                         )
                 except ApiException:
                     attach = iw.resize_image(attach)
-                    with open(attach, "rb") as attach:
+                    with open(attach, "rb") as file:
                         bot.send_photo(
                             chat_id=where_to_post,
-                            photo=attach,
+                            photo=file,
                             caption=caption,
                             reply_markup=markup,
                             parse_mode="markdown",
                             disable_notification=notification
                         )
             elif submission_type == cs.GIF_TYPE:
-                with open(attach, "rb") as attach:
+                with open(attach, "rb") as file:
                     bot.send_video(
                         chat_id=where_to_post,
-                        data=attach,
+                        data=file,
                         caption=caption,
                         reply_markup=markup,
                         parse_mode="markdown",
