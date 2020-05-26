@@ -44,7 +44,7 @@ def get_full_info(
         urls = get_url(submission, domain)
 
         if domain == cs.GFY_DOMAIN:
-            if urls.get("video_link") is None:
+            if not urls.get("video_link"):
                 print("video link is None")
                 continue
 
@@ -76,21 +76,23 @@ def get_gfycat_links(url: str) -> tuple:
         gfy_id = gfy_id.split("-")[0]
 
     api_url = f"https://api.gfycat.com/v1/gfycats/{gfy_id}"
-    r = requests.get(api_url)
-
-    size = r.json()["gfyItem"]["mp4Size"]
-    if size > cs.TELEGRAM_VIDEO_LIMIT:
-        return url, None, None
+    r = get_html(api_url)
+    if r:
+        r = r.json()
+        size = r["gfyItem"]["mp4Size"]
+        if size > cs.TELEGRAM_VIDEO_LIMIT:
+            return url, None, None
+        else:
+            gfy_gif_link = r["gfyItem"]["gifUrl"]
+            gfy_vid_link = r["gfyItem"]["mp4Url"]
+            # all request objects contains "mp4Url" and
+            # "gifUrl" links directly from "gfyItem" key
+            # gfy_gif_link = \
+            #     r.json()["gfyItem"]["content_urls"]["largeGif"]["url"]
+            # gfy_vid_link = r.json()["gfyItem"]["content_urls"]["mp4"]["url"]
+            return url, gfy_gif_link, gfy_vid_link
     else:
-        try:
-            gfy_gif_link = \
-                r.json()["gfyItem"]["content_urls"]["largeGif"]["url"]
-            gfy_vid_link = r.json()["gfyItem"]["content_urls"]["mp4"]["url"]
-        except KeyError:
-            gfy_gif_link = r.json()["gfyItem"]["gifUrl"]
-            gfy_vid_link = r.json()["gfyItem"]["mp4Url"]
-
-        return url, gfy_gif_link, gfy_vid_link
+        return url, None, None
 
 
 def what_inside(url: str) -> str:
@@ -103,7 +105,6 @@ def what_inside(url: str) -> str:
         content_type = what_type
     else:
         content_type = cs.TEXT_TYPE
-
     return content_type
 
 
@@ -113,9 +114,10 @@ def get_url(submission, domain: str) -> dict:
 
     if domain == cs.GFY_DOMAIN:
         urls = get_gfycat_links(url)
-        what_type = urls[2].split(".")[-1]
-        if what_type in cs.GIF_TYPES:
-            content_type = cs.GIF_TYPE
+        if urls[2] is not None:
+            what_type = urls[2].split(".")[-1]
+            if what_type in cs.GIF_TYPES:
+                content_type = cs.GIF_TYPE
         return {
             "url": urls[0],
             "gif_link": urls[1],
@@ -135,9 +137,11 @@ def get_url(submission, domain: str) -> dict:
 
         # in cases when url is direct .gifv
         elif content_type == cs.GIFV:
-            url = og.get("og:url").split("?")[0]
+            try:
+                url = og["og:video"].split("?")[0]
+            except KeyError:
+                url = og.get("og:url").split("?")[0]
             content_type = cs.GIF_TYPE
-
         return {"url": url, "content_type": content_type}
     elif domain in cs.RED_DOMAIN:
         if domain == cs.RED_DOMAIN[1]:
@@ -193,7 +197,6 @@ def get_html(url):
         r.raise_for_status()
         return r
     except (requests.RequestException, ValueError):
-        print("Сетевая ошибка")
         return False
 
 
@@ -207,6 +210,7 @@ def extract_open_graph(url):
         for key, value in data:
             if key not in new_data:
                 new_data[key] = value
+        # pprint.pprint(new_data)
         return new_data
     except IndexError:
         data = og.extract(url_page.text)
