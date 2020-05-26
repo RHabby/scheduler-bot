@@ -1,0 +1,52 @@
+from enum import Enum
+
+# [telegram]
+TOKEN:str = "111111111:asdfasdfasdfasdfasdfa-asdawe_asdfwre"
+ADMIN_ID:int = 11111111
+ADMIN_USERNAME:str = "username"
+CHANNEL_ID:str = ""
+
+# [reddit]
+REDDIT_CLIENT_ID:str = ""
+REDDIT_CLIENT_SECRET:str = ""
+REDDIT_USERNAME:str = ""
+REDDIT_PASSWORD:str = ""
+REDDIT_USER_AGENT:str = ""
+
+# [gfycat]
+GFY_CLIENT_ID:str = ""
+GFY_CLIENT_SECRET:str = ""
+
+# [default channels]
+default_subreddits:dict = {
+    "subreddit_01": "",
+    "subreddit_02": "",
+    "subreddit_03": "",
+    "subreddit_04": "",
+    "subreddit_05": "",
+    "subreddit_06": "",
+    "subreddit_07": "",
+    "subreddit_08": "",
+    "subreddit_09": "",
+    "subreddit_10": "",
+    "step_back": "Назад",
+}
+
+
+class States(Enum):
+    START_STATE = "0"
+    ENTER_SUBREDDIT_STATE = "1"
+    ENTER_SORTING_STATE = "2"
+    ENTER_COUNT_STATE = "3"
+    FINISH_STATE = "4"
+
+
+WEBHOOK_HOST:str = ""
+WEBHOOK_PORT:int = 8443  # 443, 80, 88 or 8443 (port need to be 'open')
+WEBHOOK_LISTEN:str = ""  # In some VPS you may need to put here the IP addr
+
+WEBHOOK_SSL_CERT:str = './path/to/cert.pem'  # Path to the ssl certificate
+WEBHOOK_SSL_PRIV:str = './path/to/private_key.pem'  # Path to the ssl private key
+
+WEBHOOK_URL_BASE:str = f"https://{WEBHOOK_HOST}:{WEBHOOK_PORT}"
+WEBHOOK_URL_PATH:str = f"/{TOKEN}/"
