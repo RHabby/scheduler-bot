@@ -1,6 +1,7 @@
 import pprint
 from time import sleep
 
+import flask
 import telebot
 from prawcore.exceptions import Redirect
 from telebot import types
@@ -15,17 +16,39 @@ from config import States
 from reddit_supplier import download_file, get_full_info
 
 bot = telebot.TeleBot(token=config.TOKEN)
-# TODO: переделать на вебхуки.
+app = flask.Flask(__name__)
 
 welcome_message = "If you are allowed to be here you must know how \
     to use me. If you are not you can use the `/help` command to find out."
+
+bot.remove_webhook()
+sleep(2)
+bot.set_webhook(
+    url=f"{config.WEBHOOK_URL_BASE}{config.WEBHOOK_URL_PATH}"
+)
+
+
+@app.route("/", methods=["GET", "HEAD"])
+def index():
+    return "Hello"
+
+
+@app.route(config.WEBHOOK_URL_PATH, methods=["POST"])
+def webhook():
+    if flask.request.headers.get("content-type") == "application/json":
+        json_string = flask.request.get_data().decode("utf-8")
+        update = types.Update.de_json(json_string)
+        bot.process_new_updates([update])
+        return ""
+    else:
+        flask.abort(403)
 
 
 @bot.message_handler(
     func=lambda message: message.from_user.id != config.ADMIN_ID)
 def answer_not_admin(message: types.Message):
     reply_text = "Hi, there! I am a bot. If you are not one of my admins,\
-         you have nothing to do here. Please, leave me alone."
+ you have nothing to do here. Please, leave me alone."
     bot.reply_to(message=message, text=reply_text)
 
 
@@ -116,7 +139,7 @@ def choose_count(message: types.Message):
             reply_markup=m.choose_count_markup,
             disable_notification=True
         )
-    elif int(message.text) < 1 or int(message.text) > 10:
+    elif int(message.text) < 1 or int(message.text) > 25:
         bot.send_message(
             chat_id=message.from_user.id,
             text="Some piece of advice here: try to enter a number between 1 and 10, please.",
@@ -331,9 +354,5 @@ def echo(message: types.Message):
 
 
 if __name__ == "__main__":
-    while True:
-        try:
-            bot.polling(none_stop=False, timeout=50)
-        except Exception as e:
-            print(f"Exception: {e}")
-            sleep(52)
+    app.run(debug=True)
+    # bot.polling(none_stop=False, timeout=50)
