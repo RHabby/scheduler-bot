@@ -18,8 +18,8 @@ from reddit_supplier import download_file, get_full_info
 bot = telebot.TeleBot(token=config.TOKEN)
 app = flask.Flask(__name__)
 
-welcome_message = "If you are allowed to be here you must know how \
-    to use me. If you are not you can use the `/help` command to find out."
+welcome_message = f"If you are allowed to be here you must know how \
+ to use me. If you are not you can use the `/help` command to find out."
 
 bot.remove_webhook()
 sleep(2)
@@ -45,11 +45,22 @@ def webhook():
 
 
 @bot.message_handler(
-    func=lambda message: message.from_user.id != config.ADMIN_ID)
+    func=lambda message: message.from_user.id not in config.ADMINS)
 def answer_not_admin(message: types.Message):
     reply_text = "Hi, there! I am a bot. If you are not one of my admins,\
  you have nothing to do here. Please, leave me alone."
+    text_to_owner = f"User @{message.chat.username} `({message.chat.first_name}\
+ {message.chat.last_name})` with ID: `{message.from_user.id}` sent me\
+ a message: {message.text}"
+
+    # answering to user
     bot.reply_to(message=message, text=reply_text)
+    # notifying the owner of an attempt to start the bot
+    bot.send_message(
+        chat_id=config.OWNER_ID,
+        text=text_to_owner,
+        parse_mode="markdown"
+    )
 
 
 @bot.message_handler(commands=["start"])
@@ -163,7 +174,7 @@ def send_reddit_photo(message: types.Message):
             subreddit_name=args.get(b"subreddit_name").decode("utf-8"),
             submission_sort=args.get(b"sorting").decode("utf-8"),
             limit=int(args.get(b"count").decode("utf-8")),
-            where_to_post=config.ADMIN_ID,
+            where_to_post=message.from_user.id,
             source="reddit"
         )
         rw.set_state(
@@ -172,7 +183,7 @@ def send_reddit_photo(message: types.Message):
         )
     except Redirect:
         bot.send_message(
-            chat_id=config.ADMIN_ID,
+            chat_id=message.from_user.id,
             text="There is no subreddit with that name, try another one",
             reply_markup=m.choose_channel_markup,
             parse_mode="markdown",
@@ -203,7 +214,7 @@ def send_simple(
     )
 
     for submission in submissions:
-        if where_to_post == config.ADMIN_ID:
+        if where_to_post in config.ADMINS:
             markup = m.forward_to_channel_markup
             notification = True
             caption = \

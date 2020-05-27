@@ -2,8 +2,9 @@ from enum import Enum
 
 # [telegram]
 TOKEN:str = "111111111:asdfasdfasdfasdfasdfa-asdawe_asdfwre"
-ADMIN_ID:int = 11111111
-ADMIN_USERNAME:str = "username"
+OWNER_ID:int = 11111111
+OWNER_USERNAME:str = "username"
+ADMINS:list = []
 CHANNEL_ID:str = ""
 
 # [reddit]
