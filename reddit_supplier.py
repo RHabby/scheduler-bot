@@ -109,7 +109,7 @@ def what_inside(url: str) -> str:
 
 
 def get_url(submission, domain: str) -> dict:
-    url = submission.url
+    url = submission.url.split("?")[0]
     content_type = what_inside(url)
 
     if domain == cs.GFY_DOMAIN:
