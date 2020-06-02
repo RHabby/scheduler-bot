@@ -1,5 +1,8 @@
-import config
+import json
+
 import redis
+
+import config
 
 redis = redis.Redis(db=1)
 
@@ -29,3 +32,18 @@ def get_values(id):
 def clear_fields(id, *args):
     redis.hdel(id, *args)
     return True
+
+
+def add_to_queue(name, data):
+    # добавляем в лист rpush
+    redis.rpush(name, data)
+    return True
+
+
+def get_from_queue(name):
+    # удаляем и возвращаем первое значение в лист lpop
+    if redis.llen(name) > 0:
+        file = json.loads(redis.lpop(name))
+        return file
+    else:
+        return False
