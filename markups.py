@@ -63,7 +63,7 @@ forward_to_channel_markup.add(types.InlineKeyboardButton(
     callback_data=cs.FORWARD
 ))
 
-# forward now of add to queue
+# forward now or add to queue
 when_forward_markup = types.InlineKeyboardMarkup(
     row_width=2
 )
@@ -79,4 +79,27 @@ when_forward_markup.row(
     types.InlineKeyboardButton(
         text="Cancel",
         callback_data=cs.CANCEL)
+)
+
+# when forwarded
+forwarded_markup = types.InlineKeyboardMarkup(
+    row_width=2
+)
+forwarded_markup.row(
+    types.InlineKeyboardButton(
+        text="Add to queue",
+        callback_data=cs.QUEUE),
+)
+
+# when added to the queue
+no_queue_markup = types.InlineKeyboardMarkup(
+    row_width=2
+)
+no_queue_markup.row(
+    types.InlineKeyboardButton(
+        text="Now",
+        callback_data=cs.FORWARD_NOW),
+    types.InlineKeyboardButton(
+        text="In queue✅",
+        callback_data=cs.NO)
 )
