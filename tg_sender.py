@@ -1,3 +1,4 @@
+import json
 import pprint
 from time import sleep
 
@@ -299,6 +300,28 @@ def send_simple(
         sleep(0.5)
 
 
+def send_with_file_id(content_type, file_id):
+    if content_type == "photo":
+        bot.send_photo(
+            chat_id=config.CHANNEL_ID,
+            photo=file_id,
+            caption=None,
+            disable_notification=True
+        )
+    elif content_type == "video":
+        bot.send_video(
+            chat_id=config.CHANNEL_ID,
+            data=file_id,
+            disable_notification=True,
+        )
+    elif content_type == "document":
+        bot.send_document(
+            chat_id=config.CHANNEL_ID,
+            data=file_id,
+            disable_notification=True,
+        )
+
+
 @bot.callback_query_handler(func=lambda call: call.data == cs.FORWARD)
 def callback_forward(call: types.CallbackQuery):
     if call.message:
@@ -315,38 +338,39 @@ def callback_forward_now(call: types.CallbackQuery):
     if call.message:
         # print(call.message.json[content_type])
         content_type = call.message.content_type
-        if content_type == "photo":
-            attach = call.message.json[content_type][0]["file_id"]
-            bot.send_photo(
-                chat_id=config.CHANNEL_ID,
-                photo=attach,
-                caption=None,
-                disable_notification=True
-            )
-        elif content_type == "video":
-            attach = call.message.json[content_type]["file_id"]
-            bot.send_video(
-                chat_id=config.CHANNEL_ID,
-                data=attach,
-                disable_notification=True,
-            )
-        elif content_type == "document":
-            attach = call.message.json[content_type]["file_id"]
-            bot.send_document(
-                chat_id=config.CHANNEL_ID,
-                data=attach,
-                disable_notification=True,
-            )
+        try:
+            file_id = call.message.json[content_type][-1]["file_id"]
+        except KeyError:
+            file_id = call.message.json[content_type]["file_id"]
+
+        send_with_file_id(content_type, file_id)
+
         bot.edit_message_reply_markup(
             chat_id=call.message.chat.id,
-            message_id=call.message.message_id
+            message_id=call.message.message_id,
+            reply_markup=m.forwarded_markup
         )
 
 
 @bot.callback_query_handler(func=lambda call: call.data == cs.QUEUE)
 def callback_queue(call: types.CallbackQuery):
     if call.message:
-        pass
+        content_type = call.message.content_type
+        try:
+            file_id = call.message.json[content_type][-1]["file_id"]
+        except KeyError:
+            file_id = call.message.json[content_type]["file_id"]
+
+        data = json.dumps({"content_type": content_type, "file_id": file_id})
+        rw.add_to_queue(
+            name="queue",
+            data=data
+        )
+        bot.edit_message_reply_markup(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            reply_markup=m.no_queue_markup
+        )
 
 
 @bot.callback_query_handler(func=lambda call: call.data == cs.CANCEL)
