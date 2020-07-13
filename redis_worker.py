@@ -12,6 +12,17 @@ def set_state(id, value):
     return True
 
 
+def set_kboard(id, key, value):
+    try:
+        kboard = json.loads(get_value(id, key))
+        kboard.append(value)
+    except TypeError:
+        kboard = [value]
+
+    set_state_value(id, key, json.dumps(kboard))
+    return True
+
+
 def get_current_state(id):
     try:
         return redis.hget(id, "state").decode("utf-8")
@@ -23,6 +34,10 @@ def get_current_state(id):
 def set_state_value(id, key, value):
     redis.hset(id, key, value)
     return True
+
+
+def get_value(id, key):
+    return redis.hget(id, key)
 
 
 def get_values(id):
@@ -47,3 +62,7 @@ def get_from_queue(name):
         return file
     else:
         return False
+
+
+if __name__ == "__main__":
+    pass
