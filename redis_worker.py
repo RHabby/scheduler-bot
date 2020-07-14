@@ -64,5 +64,17 @@ def get_from_queue(name):
         return False
 
 
+def queue_len(key):
+    return redis.llen(key)
+
+
+def queue_entities(key):
+    entities = [json.loads(x.decode("utf-8"))
+                for x in redis.lrange(key, 0, -1)]
+    return entities
+
+
 if __name__ == "__main__":
-    pass
+    # print(get_value(25043361, "channels"))
+    print(queue_len("queue"))
+    print(queue_entities("queue"))

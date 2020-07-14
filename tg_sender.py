@@ -110,6 +110,29 @@ def settings(message: types.Message):
     )
 
 
+@bot.message_handler(commands=["redis"])
+def redis(message: types.Message):
+    queue_len = rw.queue_len(key="queue")
+    queue_entities = rw.queue_entities(key="queue")
+
+    content = {
+        "photo": 0,
+        "video": 0,
+        "document": 0
+    }
+    for entity in queue_entities:
+        content[entity["content_type"]] += 1
+
+    text = f"Queue lenght: {queue_len}\n\n\
+Photo: {content['photo']}\nVideo: {content['video']}\n\
+Document: {content['document']}"
+    bot.send_message(
+        chat_id=message.chat.id,
+        text=text,
+        disable_notification=True
+    )
+
+
 @bot.callback_query_handler(func=lambda call: call.data == cs.ADD_SUBREDDIT)
 def add_subreddit_button(call: types.CallbackQuery):
     if call.message:
