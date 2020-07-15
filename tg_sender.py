@@ -10,10 +10,11 @@ from telebot.apihelper import ApiException
 import config
 import constants as cs
 import image_worker as iw
+import instagram as inst
 import markups as m
 import redis_worker as rw
 from config import States
-from reddit_supplier import download_file, get_full_info
+from reddit_supplier import download_file, get_full_info, get_html
 
 bot = telebot.TeleBot(token=config.TOKEN)
 app = flask.Flask(__name__)
@@ -130,6 +131,34 @@ Document: {content['document']}"
         chat_id=message.chat.id,
         text=text,
         disable_notification=True
+    )
+
+
+@bot.message_handler(commands=["insta"])
+def instagram(message: types.Message):
+    try:
+        insta_link = message.text.split()[1]
+    except IndexError:
+        bot.send_message(
+            chat_id=message.chat.id,
+            text="You did not send me a link after /insta command word. Try again.",
+            reply_to_message_id=message.message_id,
+            disable_notification=True
+        )
+
+    html = get_html(insta_link).text
+    data = inst.process_scripts(html)
+    links = inst.process_shared_data(data)
+
+    for link in links:
+        send_from_insta(
+            chat_id=message.chat.id,
+            link=link
+        )
+
+    bot.delete_message(
+        chat_id=message.chat.id,
+        message_id=message.message_id
     )
 
 
@@ -498,6 +527,23 @@ def send_with_file_id(chat_id, content_type, file_id, reply_markup=None):
             data=file_id,
             reply_markup=reply_markup,
             disable_notification=True,
+        )
+
+
+def send_from_insta(chat_id, link):
+    if "jpg" in link:
+        bot.send_photo(
+            chat_id=chat_id,
+            photo=link,
+            reply_markup=m.forward_to_channel_markup,
+            disable_notification=True
+        )
+    elif "mp4" in link:
+        bot.send_video(
+            chat_id=chat_id,
+            data=link,
+            reply_markup=m.forward_to_channel_markup,
+            disable_notification=True
         )
 
 
