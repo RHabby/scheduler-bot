@@ -1,12 +1,11 @@
 from time import sleep
-import config
 
 from celery import Celery
 from celery.schedules import crontab
 
+import config
 import redis_worker as rw
-from tg_bot import send_with_file_id
-import utils
+from tg_bot import checking_queue_len, send_with_file_id
 
 celery_app = Celery("tasks", broker="redis://localhost")
 
@@ -47,4 +46,4 @@ def send_from_queue():
 
 @celery_app.task(name="check_queue_len")
 def check_queue_len():
-    utils.checking_queue_len()
+    checking_queue_len()

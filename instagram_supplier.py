@@ -1,8 +1,6 @@
-import json
-
 from bs4 import BeautifulSoup
 
-from reddit_supplier import get_html
+from utils import get_html
 
 
 def process_scripts(html):

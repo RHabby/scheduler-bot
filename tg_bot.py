@@ -13,7 +13,9 @@ import instagram_supplier as inst
 import markups as m
 import redis_worker as rw
 from config import States
-from reddit_supplier import download_file, get_full_info, get_html
+from reddit_supplier import get_full_info
+from redis_worker import queue_len
+from utils import download_file, get_html
 
 bot = telebot.TeleBot(token=config.TOKEN)
 
@@ -565,6 +567,18 @@ def send_from_insta(chat_id, link):
             reply_markup=m.forward_to_channel_markup,
             disable_notification=True
         )
+
+
+def checking_queue_len():
+    queue_lenght = queue_len("queue")
+
+    if queue_lenght <= 14:
+        for admin in config.ADMINS:
+            bot.send_message(
+                chat_id=admin,
+                text="Queue lenght is smaller than 14. Add some new posts.",
+                disable_notification=False
+            )
 
 
 @bot.message_handler(func=lambda message: True)
