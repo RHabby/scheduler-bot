@@ -154,7 +154,7 @@ def get_url(submission, domain: str) -> dict:
         return {"url": url, "content_type": cs.OTHER_TYPE}
 
 
-def download_file(url, source, subreddit_name):
+def download_file(url: str, source: str, subreddit_name: str) -> str:
     file_dir = f"./attachments/{source}/{subreddit_name}"
     local_filename = url.split('/')[-1]
     path_to_file = os.path.join(file_dir, local_filename)
@@ -187,7 +187,7 @@ def get_current_utctime() -> float:
     return datetime.timestamp(datetime.utcnow())
 
 
-def get_html(url):
+def get_html(url: str):
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:70.0)\
              Gecko/20100101 Firefox/70.0"
@@ -200,7 +200,7 @@ def get_html(url):
         return False
 
 
-def extract_open_graph(url):
+def extract_open_graph(url: str):
     url_page = get_html(url)
     og = OpenGraphExtractor()
     try:
