@@ -1,26 +1,21 @@
 import json
 from time import sleep
 
-import flask
 import telebot
-from prawcore.exceptions import Redirect
+from prawcore.exceptions import NotFound, Redirect
 from telebot import types
 from telebot.apihelper import ApiException
 
 import config
 import constants as cs
 import image_worker as iw
-import instagram as inst
+import instagram_supplier as inst
 import markups as m
 import redis_worker as rw
 from config import States
 from reddit_supplier import download_file, get_full_info, get_html
 
 bot = telebot.TeleBot(token=config.TOKEN)
-app = flask.Flask(__name__)
-
-welcome_message = f"If you are allowed to be here you must know how \
- to use me. If you are not you can use the `/help` command to find out."
 
 bot.remove_webhook()
 sleep(2)
@@ -28,21 +23,8 @@ bot.set_webhook(
     url=f"{config.WEBHOOK_URL_BASE}{config.WEBHOOK_URL_PATH}"
 )
 
-
-@app.route("/", methods=["GET", "HEAD"])
-def index():
-    return "Hello"
-
-
-@app.route(config.WEBHOOK_URL_PATH, methods=["POST"])
-def webhook():
-    if flask.request.headers.get("content-type") == "application/json":
-        json_string = flask.request.get_data().decode("utf-8")
-        update = types.Update.de_json(json_string)
-        bot.process_new_updates([update])
-        return ""
-    else:
-        flask.abort(403)
+welcome_message = f"If you are allowed to be here you must know how \
+ to use me. If you are not you can use the `/help` command to find out."
 
 
 @bot.message_handler(
@@ -111,6 +93,51 @@ def settings(message: types.Message):
     )
 
 
+@bot.message_handler(commands=["insta", "i"])
+def instagram(message: types.Message):
+    try:
+        insta_link = message.text.split()[1]
+
+        html = get_html(insta_link).text
+        data = inst.process_scripts(html)
+        links = inst.process_shared_data(data)
+
+        for link in links:
+            send_from_insta(
+                chat_id=message.chat.id,
+                link=link
+            )
+
+        bot.delete_message(
+            chat_id=message.chat.id,
+            message_id=message.message_id
+        )
+    except IndexError:
+        bot.send_message(
+            chat_id=message.chat.id,
+            text="You did not send me a link after /insta command word. Try again.",
+            reply_to_message_id=message.message_id,
+            disable_notification=True
+        )
+
+
+@bot.message_handler(commands=["reddit", "r"])
+def choose_commands(message: types.Message):
+    markup = m.generate_kboard(
+        kboard_type="reply",
+        id=message.chat.id,
+        key="channels"
+    )
+    bot.send_message(
+        chat_id=message.from_user.id,
+        text="what subreddit would you like?",
+        reply_markup=markup,
+        disable_notification=True
+    )
+    rw.set_state(id=message.from_user.id,
+                 value=States.ENTER_SUBREDDIT_STATE.value)
+
+
 @bot.message_handler(commands=["redis"])
 def redis(message: types.Message):
     queue_len = rw.queue_len(key="queue")
@@ -134,174 +161,25 @@ Document: {content['document']}"
     )
 
 
-@bot.message_handler(commands=["insta"])
-def instagram(message: types.Message):
+@bot.message_handler(content_types=["photo", "video", "document"])
+def process_sent_photo(message: types.Message):
+    content_type = message.content_type
     try:
-        insta_link = message.text.split()[1]
-    except IndexError:
-        bot.send_message(
-            chat_id=message.chat.id,
-            text="You did not send me a link after /insta command word. Try again.",
-            reply_to_message_id=message.message_id,
-            disable_notification=True
-        )
+        file_id = message.json[content_type][-1]["file_id"]
+    except KeyError:
+        file_id = message.json[content_type]["file_id"]
 
-    html = get_html(insta_link).text
-    data = inst.process_scripts(html)
-    links = inst.process_shared_data(data)
-
-    for link in links:
-        send_from_insta(
-            chat_id=message.chat.id,
-            link=link
-        )
+    send_with_file_id(
+        chat_id=message.chat.id,
+        content_type=content_type,
+        file_id=file_id,
+        reply_markup=m.forward_to_channel_markup
+    )
 
     bot.delete_message(
         chat_id=message.chat.id,
         message_id=message.message_id
     )
-
-
-@bot.callback_query_handler(func=lambda call: call.data == cs.ADD_SUBREDDIT)
-def add_subreddit_button(call: types.CallbackQuery):
-    if call.message:
-        print(call.data)
-        text = "What subreddit button would you like to add? Send me a text message."
-        bot.send_message(
-            chat_id=call.message.chat.id,
-            text=text,
-            disable_notification=True
-        )
-
-        rw.set_state(id=call.message.chat.id,
-                     value=States.ADD_SUBREDDIT_STATE.value)
-
-
-@bot.message_handler(
-    func=lambda message: rw.get_current_state(message.from_user.id) == States.ADD_SUBREDDIT_STATE.value)
-def adding_subreddit_button(message: types.Message):
-    add_button = m.set_kboard(
-        id=message.chat.id,
-        key="channels",
-        value=message.text
-    )
-    rw.set_state(
-        id=message.chat.id,
-        value=States.START_STATE.value
-    )
-    if add_button:
-        bot.send_message(
-            chat_id=message.chat.id,
-            text="The button was added",
-            disable_notification=True
-        )
-
-
-@bot.callback_query_handler(func=lambda call: call.data == cs.DELETE_SUBREDDIT)
-def delete_subreddit_button(call: types.CallbackQuery):
-    if call.message:
-        text = "What subreddit button would you like to delete? Send me a text message."
-        bot.send_message(
-            chat_id=call.message.chat.id,
-            text=text,
-            disable_notification=True
-        )
-
-        rw.set_state(id=call.message.chat.id,
-                     value=States.DELETE_SUBREDDIT_STATE.value)
-
-
-@bot.message_handler(
-    func=lambda message: rw.get_current_state(message.from_user.id) == States.DELETE_SUBREDDIT_STATE.value)
-def deleting_subreddit_button(message: types.Message):
-    print(rw.get_current_state(message.from_user.id))
-    del_button = m.delete_button(
-        id=message.chat.id,
-        key="channels",
-        value=message.text
-    )
-    rw.set_state(
-        id=message.chat.id,
-        value=States.START_STATE.value
-    )
-    if del_button:
-        bot.send_message(
-            chat_id=message.chat.id,
-            text="The button was deleted",
-            disable_notification=True
-        )
-
-
-# @bot.callback_query_handler(func=lambda call: call.data == cs.ADD_WHERE_TO)
-# def add_where_to_button(call: types.CallbackQuery):
-#     if call.data:
-#         text = f"You have to send me two words with a space between them.\n\
-# For instance, CHANNEL\_NAME @channelname.\n\n \
-# CHANNEL\_NAME is what you want to see as a button text.\n\n \
-# @channelname is your channel name and link where I am gonna send your posts."
-#         bot.send_message(
-#             chat_id=call.message.chat.id,
-#             text=text,
-#             parse_mode="markdown",
-#             disable_notification=True
-#         )
-#
-#         rw.set_state(id=call.message.chat.id,
-#                      value=States.ADD_WHERE_TO_STATE.value)
-
-
-# @bot.message_handler(
-#     func=lambda message: rw.get_current_state(message.from_user.id) == States.ADD_WHERE_TO_STATE.value)
-# def adding_where_to(message: types.Message):
-#     button = message.text.split()
-#     if button[1].startswith("@") or button[1].startswith("-"):
-#         button = {"text": button[0], "callback_data": button[1]}
-#     else:
-#         button = {"text": button[0], "callback_data": f"@{button[1]}"}
-#
-#     add_button = m.set_kboard(
-#         id=message.chat.id,
-#         key="where_to",
-#         value=button
-#     )
-#     rw.set_state(
-#         id=message.chat.id,
-#         value=States.START_STATE.value
-#     )
-#     if add_button:
-#         bot.send_message(
-#             chat_id=message.chat.id,
-#             text="The button was added",
-#             disable_notification=True
-#         )
-
-
-# @bot.callback_query_handler(func=lambda call: call.data == cs.DELETE_WHERE_TO)
-# def delete_where_to_button(call: types.CallbackQuery):
-#     pass
-
-
-# @bot.message_handler(
-#     func=lambda message: rw.get_current_state(message.from_user.id) == States.DELETE_WHERE_TO_STATE.value)
-# def deleting_where_to(message: types.Message):
-#     pass
-
-
-@bot.message_handler(commands=["reddit"])
-def choose_commands(message: types.Message):
-    markup = m.generate_kboard(
-        kboard_type="reply",
-        id=message.chat.id,
-        key="channels"
-    )
-    bot.send_message(
-        chat_id=message.from_user.id,
-        text="what subreddit would you like?",
-        reply_markup=markup,
-        disable_notification=True
-    )
-    rw.set_state(id=message.from_user.id,
-                 value=States.ENTER_SUBREDDIT_STATE.value)
 
 
 @bot.message_handler(
@@ -364,6 +242,47 @@ def choose_count(message: types.Message):
         return send_reddit_photo(message)
 
 
+@bot.message_handler(
+    func=lambda message: rw.get_current_state(message.from_user.id) == States.ADD_SUBREDDIT_STATE.value)
+def adding_subreddit_button(message: types.Message):
+    add_button = m.set_kboard(
+        id=message.chat.id,
+        key="channels",
+        value=message.text
+    )
+    rw.set_state(
+        id=message.chat.id,
+        value=States.START_STATE.value
+    )
+    if add_button:
+        bot.send_message(
+            chat_id=message.chat.id,
+            text="The button was added",
+            disable_notification=True
+        )
+
+
+@bot.message_handler(
+    func=lambda message: rw.get_current_state(message.from_user.id) == States.DELETE_SUBREDDIT_STATE.value)
+def deleting_subreddit_button(message: types.Message):
+    print(rw.get_current_state(message.from_user.id))
+    del_button = m.delete_button(
+        id=message.chat.id,
+        key="channels",
+        value=message.text
+    )
+    rw.set_state(
+        id=message.chat.id,
+        value=States.START_STATE.value
+    )
+    if del_button:
+        bot.send_message(
+            chat_id=message.chat.id,
+            text="The button was deleted",
+            disable_notification=True
+        )
+
+
 @bot.callback_query_handler(func=lambda call: call.data == cs.FORWARD)
 def callback_forward(call: types.CallbackQuery):
     if call.message:
@@ -372,6 +291,102 @@ def callback_forward(call: types.CallbackQuery):
             message_id=call.message.message_id,
             reply_markup=m.when_forward_markup
         )
+
+
+@bot.callback_query_handler(func=lambda call: call.data == cs.FORWARD_NOW)
+def callback_forward_now(call: types.CallbackQuery):
+    if call.message:
+        content_type = call.message.content_type
+        try:
+            file_id = call.message.json[content_type][-1]["file_id"]
+        except KeyError:
+            file_id = call.message.json[content_type]["file_id"]
+
+        send_with_file_id(
+            chat_id=config.CHANNEL_ID,
+            content_type=content_type,
+            file_id=file_id
+        )
+
+        bot.edit_message_reply_markup(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            reply_markup=m.forwarded_markup
+        )
+
+
+@bot.callback_query_handler(func=lambda call: call.data == cs.QUEUE)
+def callback_queue(call: types.CallbackQuery):
+    if call.message:
+        content_type = call.message.content_type
+        try:
+            file_id = call.message.json[content_type][-1]["file_id"]
+        except KeyError:
+            file_id = call.message.json[content_type]["file_id"]
+
+        data = json.dumps({"content_type": content_type, "file_id": file_id})
+
+        rw.add_to_queue(
+            name="queue",
+            data=data
+        )
+        bot.edit_message_reply_markup(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            reply_markup=m.no_queue_markup
+        )
+
+
+@bot.callback_query_handler(func=lambda call: call.data == cs.CANCEL)
+def callback_cancel(call: types.CallbackQuery):
+    if call.message:
+        bot.edit_message_reply_markup(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id,
+            reply_markup=m.forward_to_channel_markup
+        )
+
+
+@bot.callback_query_handler(func=lambda call: call.data == cs.OUT)
+def callback_out_of_settings(call: types.CallbackQuery):
+    if call.message:
+        bot.delete_message(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id
+        )
+        bot.delete_message(
+            chat_id=call.message.chat.id,
+            message_id=call.message.message_id-1
+        )
+
+
+@bot.callback_query_handler(func=lambda call: call.data == cs.ADD_SUBREDDIT)
+def add_subreddit_button(call: types.CallbackQuery):
+    if call.message:
+        print(call.data)
+        text = "What subreddit button would you like to add? Send me a text message."
+        bot.send_message(
+            chat_id=call.message.chat.id,
+            text=text,
+            disable_notification=True
+        )
+
+        rw.set_state(id=call.message.chat.id,
+                     value=States.ADD_SUBREDDIT_STATE.value)
+
+
+@bot.callback_query_handler(func=lambda call: call.data == cs.DELETE_SUBREDDIT)
+def delete_subreddit_button(call: types.CallbackQuery):
+    if call.message:
+        text = "What subreddit button would you like to delete? Send me a text message."
+        bot.send_message(
+            chat_id=call.message.chat.id,
+            text=text,
+            disable_notification=True
+        )
+
+        rw.set_state(id=call.message.chat.id,
+                     value=States.DELETE_SUBREDDIT_STATE.value)
 
 
 def send_reddit_photo(message: types.Message):
@@ -388,11 +403,16 @@ def send_reddit_photo(message: types.Message):
             id=message.from_user.id,
             value=config.States.START_STATE.value
         )
-    except Redirect:
+    except (Redirect, NotFound):
+        markup = m.generate_kboard(
+            kboard_type="reply",
+            id=message.chat.id,
+            key="channels"
+        )
         bot.send_message(
             chat_id=message.from_user.id,
             text="There is no subreddit with that name, try another one",
-            reply_markup=m.choose_channel_markup,
+            reply_markup=markup,
             parse_mode="markdown",
             disable_notification=True
         )
@@ -547,98 +567,66 @@ def send_from_insta(chat_id, link):
         )
 
 
-@bot.callback_query_handler(func=lambda call: call.data == cs.FORWARD_NOW)
-def callback_forward_now(call: types.CallbackQuery):
-    if call.message:
-        content_type = call.message.content_type
-        try:
-            file_id = call.message.json[content_type][-1]["file_id"]
-        except KeyError:
-            file_id = call.message.json[content_type]["file_id"]
-
-        send_with_file_id(
-            chat_id=config.CHANNEL_ID,
-            content_type=content_type,
-            file_id=file_id
-        )
-
-        bot.edit_message_reply_markup(
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            reply_markup=m.forwarded_markup
-        )
-
-
-@bot.callback_query_handler(func=lambda call: call.data == cs.QUEUE)
-def callback_queue(call: types.CallbackQuery):
-    if call.message:
-        content_type = call.message.content_type
-        try:
-            file_id = call.message.json[content_type][-1]["file_id"]
-        except KeyError:
-            file_id = call.message.json[content_type]["file_id"]
-
-        data = json.dumps({"content_type": content_type, "file_id": file_id})
-        rw.add_to_queue(
-            name="queue",
-            data=data
-        )
-        bot.edit_message_reply_markup(
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            reply_markup=m.no_queue_markup
-        )
-
-
-@bot.callback_query_handler(func=lambda call: call.data == cs.CANCEL)
-def callback_cancel(call: types.CallbackQuery):
-    if call.message:
-        bot.edit_message_reply_markup(
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id,
-            reply_markup=m.forward_to_channel_markup
-        )
-
-
-@bot.callback_query_handler(func=lambda call: call.data == cs.OUT)
-def callback_out_of_settings(call: types.CallbackQuery):
-    if call.message:
-        bot.delete_message(
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id
-        )
-        bot.delete_message(
-            chat_id=call.message.chat.id,
-            message_id=call.message.message_id-1
-        )
-
-
-@bot.message_handler(content_types=["photo", "video", "document"])
-def process_sent_photo(message: types.Message):
-    content_type = message.content_type
-    try:
-        file_id = message.json[content_type][-1]["file_id"]
-    except KeyError:
-        file_id = message.json[content_type]["file_id"]
-
-    send_with_file_id(
-        chat_id=message.chat.id,
-        content_type=content_type,
-        file_id=file_id,
-        reply_markup=m.forward_to_channel_markup
-    )
-
-    bot.delete_message(
-        chat_id=message.chat.id,
-        message_id=message.message_id
-    )
-
-
 @bot.message_handler(func=lambda message: True)
 def echo(message: types.Message):
     bot.reply_to(message, message.text)
 
 
+# @bot.callback_query_handler(func=lambda call: call.data == cs.ADD_WHERE_TO)
+# def add_where_to_button(call: types.CallbackQuery):
+#     if call.data:
+#         text = f"You have to send me two words with a space between them.\n\
+# For instance, CHANNEL\_NAME @channelname.\n\n \
+# CHANNEL\_NAME is what you want to see as a button text.\n\n \
+# @channelname is your channel name and link where I am gonna send your posts."
+#         bot.send_message(
+#             chat_id=call.message.chat.id,
+#             text=text,
+#             parse_mode="markdown",
+#             disable_notification=True
+#         )
+#
+#         rw.set_state(id=call.message.chat.id,
+#                      value=States.ADD_WHERE_TO_STATE.value)
+
+
+# @bot.message_handler(
+#     func=lambda message: rw.get_current_state(message.from_user.id) == States.ADD_WHERE_TO_STATE.value)
+# def adding_where_to(message: types.Message):
+#     button = message.text.split()
+#     if button[1].startswith("@") or button[1].startswith("-"):
+#         button = {"text": button[0], "callback_data": button[1]}
+#     else:
+#         button = {"text": button[0], "callback_data": f"@{button[1]}"}
+#
+#     add_button = m.set_kboard(
+#         id=message.chat.id,
+#         key="where_to",
+#         value=button
+#     )
+#     rw.set_state(
+#         id=message.chat.id,
+#         value=States.START_STATE.value
+#     )
+#     if add_button:
+#         bot.send_message(
+#             chat_id=message.chat.id,
+#             text="The button was added",
+#             disable_notification=True
+#         )
+
+
+# @bot.callback_query_handler(func=lambda call: call.data == cs.DELETE_WHERE_TO)
+# def delete_where_to_button(call: types.CallbackQuery):
+#     pass
+
+
+# @bot.message_handler(
+#     func=lambda message: rw.get_current_state(message.from_user.id) == States.DELETE_WHERE_TO_STATE.value)
+# def deleting_where_to(message: types.Message):
+#     pass
+
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    pass
     # bot.polling(none_stop=False, timeout=50)
