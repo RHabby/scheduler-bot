@@ -106,6 +106,7 @@ def extract_open_graph(url: str):
     except IndexError:
         data = og.extract(url_page.text)
         return data
+<<<<<<< HEAD
 
 
 def is_direct_link(url: str) -> bool:
@@ -119,3 +120,5 @@ def is_direct_link(url: str) -> bool:
 
 if __name__ == "__main__":
     pass
+=======
+>>>>>>> parent of 00af2bf... processing direct links
