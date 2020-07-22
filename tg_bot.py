@@ -16,6 +16,7 @@ from config import States
 from reddit_supplier import get_full_info
 from redis_worker import queue_len
 from utils import download_file, get_html
+from decorators import retry
 
 bot = telebot.TeleBot(token=config.TOKEN)
 
@@ -25,18 +26,19 @@ bot.set_webhook(
     url=f"{config.WEBHOOK_URL_BASE}{config.WEBHOOK_URL_PATH}"
 )
 
-welcome_message = f"If you are allowed to be here you must know how \
- to use me. If you are not you can use the `/help` command to find out."
-
 
 @bot.message_handler(
-    func=lambda message: message.from_user.id not in config.ADMINS)
+    func=lambda message: message.from_user.id not in config.ADMINS,
+    content_types=["text", "audio", "document",
+                   "photo", "sticker", "video", "video_note"]
+)
+@retry
 def answer_not_admin(message: types.Message):
     reply_text = "Hi there! I am a bot. If you are not one of my admins,\
  you have nothing to do here. Please, leave me alone."
     text_to_owner = f"User @{message.chat.username} `({message.chat.first_name}\
  {message.chat.last_name})` with ID: `{message.from_user.id}` sent me\
- a message: {message.text}"
+ a message: {message.text if message.text else message.content_type}"
 
     # answering to user
     bot.reply_to(message=message, text=reply_text)
@@ -46,11 +48,18 @@ def answer_not_admin(message: types.Message):
         text=text_to_owner,
         parse_mode="markdown"
     )
+    if message.content_type != "text":
+        bot.forward_message(
+            chat_id=config.OWNER_ID,
+            from_chat_id=message.chat.id,
+            message_id=message.message_id
+        )
 
 
 @bot.message_handler(commands=["start"])
+@retry
 def start(message: types.Message):
-    welcome = f"Hello, {message.from_user.first_name}.\n{welcome_message}"
+    welcome = f"Hello, {message.from_user.first_name}.\n{cs.welcome_message}"
     bot.send_message(
         chat_id=message.from_user.id,
         text=welcome,
@@ -66,8 +75,9 @@ def start(message: types.Message):
 
 
 @bot.message_handler(commands=["help"])
+@retry
 def help(message: types.Message):
-    text = "Commands:\n"
+    text = "*Commands:*\n"
     for key, value in cs.commands.items():
         text += f"{key} — {value}\n"
 
@@ -81,6 +91,7 @@ def help(message: types.Message):
 
 
 @bot.message_handler(commands={"settings"})
+@retry
 def settings(message: types.Message):
     text = "Here is some setting:"
     bot.send_message(
@@ -96,6 +107,7 @@ def settings(message: types.Message):
 
 
 @bot.message_handler(commands=["insta", "i"])
+@retry
 def instagram(message: types.Message):
     try:
         insta_link = message.text.split()[1]
@@ -124,6 +136,7 @@ def instagram(message: types.Message):
 
 
 @bot.message_handler(commands=["reddit", "r"])
+@retry
 def choose_commands(message: types.Message):
     markup = m.generate_kboard(
         kboard_type="reply",
@@ -141,6 +154,7 @@ def choose_commands(message: types.Message):
 
 
 @bot.message_handler(commands=["redis"])
+@retry
 def redis(message: types.Message):
     queue_len = rw.queue_len(key="queue")
     queue_entities = rw.queue_entities(key="queue")
@@ -153,9 +167,9 @@ def redis(message: types.Message):
     for entity in queue_entities:
         content[entity["content_type"]] += 1
 
-    text = f"Queue lenght: {queue_len}\n\n\
-Photo: {content['photo']}\nVideo: {content['video']}\n\
-Document: {content['document']}"
+    text = f"Queue lenght: {queue_len}\n\
+ |Photo: {content['photo']}\n |Video: {content['video']}\n\
+ |Document: {content['document']}"
     bot.send_message(
         chat_id=message.chat.id,
         text=text,
@@ -164,6 +178,7 @@ Document: {content['document']}"
 
 
 @bot.message_handler(content_types=["photo", "video", "document"])
+@retry
 def process_sent_photo(message: types.Message):
     content_type = message.content_type
     try:
@@ -186,6 +201,7 @@ def process_sent_photo(message: types.Message):
 
 @bot.message_handler(
     func=lambda message: rw.get_current_state(message.from_user.id) == States.ENTER_SUBREDDIT_STATE.value)
+@retry
 def choose_channel(message: types.Message):
     rw.set_state_value(message.from_user.id,
                        "subreddit_name", message.text)
@@ -201,6 +217,7 @@ def choose_channel(message: types.Message):
 
 @bot.message_handler(
     func=lambda message: rw.get_current_state(message.from_user.id) == States.ENTER_SORTING_STATE.value)
+@retry
 def choose_sorting(message: types.Message):
     rw.set_state_value(message.from_user.id,
                        "sorting", message.text)
@@ -215,6 +232,7 @@ def choose_sorting(message: types.Message):
 
 @bot.message_handler(
     func=lambda message: rw.get_current_state(message.from_user.id) == States.ENTER_COUNT_STATE.value)
+@retry
 def choose_count(message: types.Message):
     if message.text.lower() == "назад":
         pass
@@ -246,6 +264,7 @@ def choose_count(message: types.Message):
 
 @bot.message_handler(
     func=lambda message: rw.get_current_state(message.from_user.id) == States.ADD_SUBREDDIT_STATE.value)
+@retry
 def adding_subreddit_button(message: types.Message):
     add_button = m.set_kboard(
         id=message.chat.id,
@@ -266,6 +285,7 @@ def adding_subreddit_button(message: types.Message):
 
 @bot.message_handler(
     func=lambda message: rw.get_current_state(message.from_user.id) == States.DELETE_SUBREDDIT_STATE.value)
+@retry
 def deleting_subreddit_button(message: types.Message):
     print(rw.get_current_state(message.from_user.id))
     del_button = m.delete_button(
@@ -286,6 +306,7 @@ def deleting_subreddit_button(message: types.Message):
 
 
 @bot.callback_query_handler(func=lambda call: call.data == cs.FORWARD)
+@retry
 def callback_forward(call: types.CallbackQuery):
     if call.message:
         bot.edit_message_reply_markup(
@@ -296,6 +317,7 @@ def callback_forward(call: types.CallbackQuery):
 
 
 @bot.callback_query_handler(func=lambda call: call.data == cs.FORWARD_NOW)
+@retry
 def callback_forward_now(call: types.CallbackQuery):
     if call.message:
         content_type = call.message.content_type
@@ -318,6 +340,7 @@ def callback_forward_now(call: types.CallbackQuery):
 
 
 @bot.callback_query_handler(func=lambda call: call.data == cs.QUEUE)
+@retry
 def callback_queue(call: types.CallbackQuery):
     if call.message:
         content_type = call.message.content_type
@@ -340,6 +363,7 @@ def callback_queue(call: types.CallbackQuery):
 
 
 @bot.callback_query_handler(func=lambda call: call.data == cs.CANCEL)
+@retry
 def callback_cancel(call: types.CallbackQuery):
     if call.message:
         bot.edit_message_reply_markup(
@@ -350,6 +374,7 @@ def callback_cancel(call: types.CallbackQuery):
 
 
 @bot.callback_query_handler(func=lambda call: call.data == cs.OUT)
+@retry
 def callback_out_of_settings(call: types.CallbackQuery):
     if call.message:
         bot.delete_message(
@@ -363,6 +388,7 @@ def callback_out_of_settings(call: types.CallbackQuery):
 
 
 @bot.callback_query_handler(func=lambda call: call.data == cs.ADD_SUBREDDIT)
+@retry
 def add_subreddit_button(call: types.CallbackQuery):
     if call.message:
         print(call.data)
@@ -378,6 +404,7 @@ def add_subreddit_button(call: types.CallbackQuery):
 
 
 @bot.callback_query_handler(func=lambda call: call.data == cs.DELETE_SUBREDDIT)
+@retry
 def delete_subreddit_button(call: types.CallbackQuery):
     if call.message:
         text = "What subreddit button would you like to delete? Send me a text message."
@@ -528,6 +555,7 @@ def send_simple(
         sleep(0.5)
 
 
+@retry
 def send_with_file_id(chat_id, content_type, file_id, reply_markup=None):
     if content_type == "photo":
         bot.send_photo(
