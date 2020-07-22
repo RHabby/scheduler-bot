@@ -5,6 +5,7 @@ import requests
 from extruct.opengraph import OpenGraphExtractor
 
 import constants as cs
+import pprint
 
 
 def get_gfycat_links(url: str) -> tuple:
@@ -101,8 +102,32 @@ def extract_open_graph(url: str):
         for key, value in data:
             if key not in new_data:
                 new_data[key] = value
-        # pprint.pprint(new_data)
+        # print(new_data)
         return new_data
     except IndexError:
         data = og.extract(url_page.text)
         return data
+
+
+def is_direct_link(url: str) -> bool:
+    frmt = url.split(".")[-1]
+    print(frmt)
+    if frmt == "mp4" or frmt in cs.IMG_TYPES:
+        return True
+    else:
+        return False
+
+
+if __name__ == "__main__":
+    listo = ["https://gfycat.com/flawedenchantedgibbon",
+             "https://gfycat.com/somberinsignificantfox",
+             "https://gfycat.com/victoriousselfreliantamericanbobtail",
+             "https://i.imgur.com/6hIROlx.gifv",
+             "https://i.imgur.com/rN2Deyw.mp4"]
+    for link in listo:
+        try:
+            og = extract_open_graph(link)
+            pprint.pprint(og)
+            print("-" * 55)
+        except Exception as e:
+            print(f"Link: {link}, Exception: {repr(e)}")
