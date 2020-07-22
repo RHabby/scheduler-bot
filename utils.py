@@ -5,7 +5,6 @@ import requests
 from extruct.opengraph import OpenGraphExtractor
 
 import constants as cs
-import pprint
 
 
 def get_gfycat_links(url: str) -> tuple:
@@ -102,7 +101,7 @@ def extract_open_graph(url: str):
         for key, value in data:
             if key not in new_data:
                 new_data[key] = value
-        # print(new_data)
+        # pprint.pprint(new_data)
         return new_data
     except IndexError:
         data = og.extract(url_page.text)

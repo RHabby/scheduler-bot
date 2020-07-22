@@ -22,7 +22,8 @@ VIDEO_TYPE = "mp4"
 
 TELEGRAM_VIDEO_LIMIT = 50 * 1024 * 1024
 
-welcome_message = "If you are allowed to be here you must know how  to use me. If you are not you can use the /help command to find out."
+welcome_message = f"If you are allowed to be here you must know how \
+ to use me. If you are not you can use the `/help` command to find out."
 
 commands = {
     "/start": "start the bot;",
@@ -30,7 +31,7 @@ commands = {
     "/settings": "set your subreddits list;",
     "/reddit": "gives content from reddit;",
     "/redis": "short info about queue and content types in it;",
-    "/insta": " send command and link to instagram post."
+    "/insta": "send command and link to instagram post."
 }
 
 # callback data
