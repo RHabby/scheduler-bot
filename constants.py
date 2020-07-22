@@ -22,13 +22,16 @@ VIDEO_TYPE = "mp4"
 
 TELEGRAM_VIDEO_LIMIT = 50 * 1024 * 1024
 
+welcome_message = f"If you are allowed to be here you must know how \
+ to use me. If you are not you can use the `/help` command to find out."
+
 commands = {
-    "/start": "Start the bot,",
-    "/help": "Bot help,",
-    "/settings": "Allows you to set and manage your source subreddits list,",
-    "/reddit": "Gives content from reddit,",
-    "/redis": "Gives saved content from Redis database _(not implemented)_,",
-    "/instagram": "Gives content from Instagram _(not implemented)_."
+    "/start": "start the bot;",
+    "/help": "bot help;",
+    "/settings": "set your subreddits list;",
+    "/reddit": "gives content from reddit;",
+    "/redis": "short info about queue and content types in it;",
+    "/insta": "send command and link to instagram post."
 }
 
 # callback data
