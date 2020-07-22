@@ -119,15 +119,4 @@ def is_direct_link(url: str) -> bool:
 
 
 if __name__ == "__main__":
-    listo = ["https://gfycat.com/flawedenchantedgibbon",
-             "https://gfycat.com/somberinsignificantfox",
-             "https://gfycat.com/victoriousselfreliantamericanbobtail",
-             "https://i.imgur.com/6hIROlx.gifv",
-             "https://i.imgur.com/rN2Deyw.mp4"]
-    for link in listo:
-        try:
-            og = extract_open_graph(link)
-            pprint.pprint(og)
-            print("-" * 55)
-        except Exception as e:
-            print(f"Link: {link}, Exception: {repr(e)}")
+    pass
