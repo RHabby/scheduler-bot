@@ -71,8 +71,6 @@ def get_url(submission, domain: str) -> dict:
     url = submission.url.split("?")[0]
     content_type = utils.what_inside(url)
 
-    if utils.is_direct_link(url):
-        return {"url": url, "content_type": content_type}
     if domain == cs.GFY_DOMAIN:
         urls = utils.get_gfycat_links(url)
         if urls[2] is not None:
