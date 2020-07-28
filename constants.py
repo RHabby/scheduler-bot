@@ -45,3 +45,26 @@ ADD_SUBREDDIT = "add subreddit"
 DELETE_SUBREDDIT = "delete subreddit"
 ADD_WHERE_TO = "add where"
 DELETE_WHERE_TO = "delete where"
+
+# logging configuration
+dict_log_config = {
+    "version": 1,
+    "handlers": {
+        "fileHandler": {
+            "class": "logging.FileHandler",
+            "formatter": "bot_formatter",
+            "filename": "./logs/bot_logs.log"
+        }
+    },
+    "loggers": {
+        "bot_logger": {
+            "handlers": ["fileHandler"],
+            "level": "INFO"
+        }
+    },
+    "formatters": {
+        "bot_formatter": {
+            "format": "%(asctime)s | %(name)s | %(levelname)s | %(message)s"
+        }
+    }
+}

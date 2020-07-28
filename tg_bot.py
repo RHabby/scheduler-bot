@@ -1,4 +1,6 @@
 import json
+import logging
+import logging.config
 from time import sleep
 
 import telebot
@@ -13,10 +15,10 @@ import instagram_supplier as inst
 import markups as m
 import redis_worker as rw
 from config import States
+from decorators import retry
 from reddit_supplier import get_full_info
 from redis_worker import queue_len
 from utils import download_file, get_html
-from decorators import retry
 
 bot = telebot.TeleBot(token=config.TOKEN)
 
@@ -26,18 +28,20 @@ bot.set_webhook(
     url=f"{config.WEBHOOK_URL_BASE}{config.WEBHOOK_URL_PATH}"
 )
 
+logging.config.dictConfig(config=cs.dict_log_config)
+logger = logging.getLogger("bot_logger")
+
 
 @bot.message_handler(
     func=lambda message: message.from_user.id not in config.ADMINS,
     content_types=["text", "audio", "document",
-                   "photo", "sticker", "video", "video_note"]
-)
+                   "photo", "sticker", "video", "video_note"])
 @retry
 def answer_not_admin(message: types.Message):
     reply_text = "Hi there! I am a bot. If you are not one of my admins,\
  you have nothing to do here. Please, leave me alone."
     text_to_owner = f"User @{message.chat.username} `({message.chat.first_name}\
- {message.chat.last_name})` with ID: `{message.from_user.id}` sent me\
+ {message.chat.last_name})` with ID: `{message.chat.id}` sent me\
  a message: {message.text if message.text else message.content_type}"
 
     # answering to user
@@ -54,6 +58,10 @@ def answer_not_admin(message: types.Message):
             from_chat_id=message.chat.id,
             message_id=message.message_id
         )
+
+    logger.info(f"User @{message.chat.username} `({message.chat.first_name}\
+ {message.chat.last_name})` with ID: `{message.chat.id}` sent me\
+ a message: {message.text if message.text else message.content_type}")
 
 
 @bot.message_handler(commands=["start"])
@@ -72,6 +80,8 @@ def start(message: types.Message):
         id=message.from_user.id,
         value=States.START_STATE.value
     )
+    logger.info(
+        f"Bot was started by user {message.chat.username} with ID: {message.chat.id}")
 
 
 @bot.message_handler(commands=["help"])
@@ -126,7 +136,11 @@ def instagram(message: types.Message):
             chat_id=message.chat.id,
             message_id=message.message_id
         )
+        logger.info(
+            f"Command: /insta. User {message.chat.username}, ID: {message.chat.id} sent links {links}")
     except IndexError:
+        logger.info(
+            f"Empty /insta command. User {message.chat.username}, ID: {message.chat.id}")
         bot.send_message(
             chat_id=message.chat.id,
             text="You did not send me a link after /insta command word. Try again.",
@@ -178,7 +192,6 @@ def redis(message: types.Message):
 
 
 @bot.message_handler(content_types=["photo", "video", "document"])
-@retry
 def process_sent_photo(message: types.Message):
     content_type = message.content_type
     try:
@@ -232,7 +245,6 @@ def choose_sorting(message: types.Message):
 
 @bot.message_handler(
     func=lambda message: rw.get_current_state(message.from_user.id) == States.ENTER_COUNT_STATE.value)
-@retry
 def choose_count(message: types.Message):
     if message.text.lower() == "назад":
         pass
@@ -264,7 +276,6 @@ def choose_count(message: types.Message):
 
 @bot.message_handler(
     func=lambda message: rw.get_current_state(message.from_user.id) == States.ADD_SUBREDDIT_STATE.value)
-@retry
 def adding_subreddit_button(message: types.Message):
     add_button = m.set_kboard(
         id=message.chat.id,
@@ -285,7 +296,6 @@ def adding_subreddit_button(message: types.Message):
 
 @bot.message_handler(
     func=lambda message: rw.get_current_state(message.from_user.id) == States.DELETE_SUBREDDIT_STATE.value)
-@retry
 def deleting_subreddit_button(message: types.Message):
     print(rw.get_current_state(message.from_user.id))
     del_button = m.delete_button(
@@ -331,7 +341,8 @@ def callback_forward_now(call: types.CallbackQuery):
             content_type=content_type,
             file_id=file_id
         )
-
+        logger.info(
+            f"Forwarded to channel: channel[{config.CHANNEL_ID}], content_type[{content_type}], file_id[{file_id}]")
         bot.edit_message_reply_markup(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
@@ -355,6 +366,8 @@ def callback_queue(call: types.CallbackQuery):
             name="queue",
             data=data
         )
+        logger.info(
+            f"Added to queue: content_type[{content_type}], file_id[{file_id}]")
         bot.edit_message_reply_markup(
             chat_id=call.message.chat.id,
             message_id=call.message.message_id,
@@ -363,7 +376,6 @@ def callback_queue(call: types.CallbackQuery):
 
 
 @bot.callback_query_handler(func=lambda call: call.data == cs.CANCEL)
-@retry
 def callback_cancel(call: types.CallbackQuery):
     if call.message:
         bot.edit_message_reply_markup(
@@ -374,7 +386,6 @@ def callback_cancel(call: types.CallbackQuery):
 
 
 @bot.callback_query_handler(func=lambda call: call.data == cs.OUT)
-@retry
 def callback_out_of_settings(call: types.CallbackQuery):
     if call.message:
         bot.delete_message(
@@ -388,7 +399,6 @@ def callback_out_of_settings(call: types.CallbackQuery):
 
 
 @bot.callback_query_handler(func=lambda call: call.data == cs.ADD_SUBREDDIT)
-@retry
 def add_subreddit_button(call: types.CallbackQuery):
     if call.message:
         print(call.data)
@@ -404,7 +414,6 @@ def add_subreddit_button(call: types.CallbackQuery):
 
 
 @bot.callback_query_handler(func=lambda call: call.data == cs.DELETE_SUBREDDIT)
-@retry
 def delete_subreddit_button(call: types.CallbackQuery):
     if call.message:
         text = "What subreddit button would you like to delete? Send me a text message."
@@ -432,7 +441,13 @@ def send_reddit_photo(message: types.Message):
             id=message.from_user.id,
             value=config.States.START_STATE.value
         )
-    except (Redirect, NotFound):
+        logger.info(f'Command: /reddit. User {message.chat.username} \
+with ID: {message.chat.id}. \
+Subreddit name: {args.get(b"subreddit_name").decode("utf-8")}, \
+sorting: {args.get(b"sorting").decode("utf-8")}, \
+count: {int(args.get(b"count").decode("utf-8"))}')
+
+    except (Redirect, NotFound) as e:
         markup = m.generate_kboard(
             kboard_type="reply",
             id=message.chat.id,
@@ -445,6 +460,11 @@ def send_reddit_photo(message: types.Message):
             parse_mode="markdown",
             disable_notification=True
         )
+        logger.info(f'{repr(e)}. Command: /reddit. User {message.chat.username} \
+ID: {message.chat.id}. \
+Subreddit name: {args.get(b"subreddit_name").decode("utf-8")}, \
+sorting: {args.get(b"sorting").decode("utf-8")}, \
+count: {int(args.get(b"count").decode("utf-8"))}')
         rw.set_state(
             id=message.from_user.id,
             value=config.States.ENTER_SUBREDDIT_STATE.value
@@ -487,6 +507,7 @@ def send_simple(
         else:
             attach = submission.get("url")
 
+        logger.info(f"file: {attach}, content type: {submission_type}")
         try:
             if submission_type == cs.IMG_TYPE:
                 bot.send_photo(
@@ -506,8 +527,10 @@ def send_simple(
                     parse_mode="markdown",
                     disable_notification=notification
                 )
-        except ApiException:
+        except ApiException as e:
+            logger.error(repr(e))
             attach = download_file(attach, source, subreddit_name)
+            logger.info(f"Downloaded file: {attach}")
             if submission_type == cs.IMG_TYPE:
                 try:
                     with open(attach, "rb") as file:
@@ -522,7 +545,8 @@ def send_simple(
                             parse_mode="markdown",
                             disable_notification=notification
                         )
-                except ApiException:
+                except ApiException as e:
+                    logger.error(repr(e))
                     attach = iw.resize_image(attach)
                     with open(attach, "rb") as file:
                         bot.send_photo(
@@ -552,7 +576,6 @@ def send_simple(
                 parse_mode="markdown",
                 disable_notification=notification
             )
-        sleep(0.5)
 
 
 @retry
@@ -600,7 +623,7 @@ def send_from_insta(chat_id, link):
 def checking_queue_len():
     queue_lenght = queue_len("queue")
 
-    if queue_lenght <= 14:
+    if queue_lenght <= 10:
         for admin in config.ADMINS:
             bot.send_message(
                 chat_id=admin,
