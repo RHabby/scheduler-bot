@@ -1,4 +1,5 @@
 import os
+import subprocess
 from datetime import datetime
 
 import requests
@@ -54,10 +55,8 @@ def download_file(url: str, source: str, subreddit_name: str) -> str:
         os.makedirs(file_dir)
 
     if os.path.exists(path_to_file):
-        print(f"{path_to_file} — exists")
         return path_to_file
     else:
-        print(f"{path_to_file} — downloading")
         # NOTE the stream=True parameter below
         chunk_size = 1024
         chunk_counter = 0
@@ -101,7 +100,6 @@ def extract_open_graph(url: str):
         for key, value in data:
             if key not in new_data:
                 new_data[key] = value
-        # pprint.pprint(new_data)
         return new_data
     except IndexError:
         data = og.extract(url_page.text)
@@ -110,11 +108,33 @@ def extract_open_graph(url: str):
 
 def is_direct_link(url: str) -> bool:
     frmt = url.split(".")[-1]
-    print(frmt)
-    if frmt == "mp4" or frmt in cs.IMG_TYPES:
+    if frmt == "mp4":
         return True
     else:
         return False
+
+
+def check_folder_size(folder: str) -> int:
+    size = subprocess.check_output(
+        ["du", "-sh", folder]).split()[0].decode("utf-8")
+
+    try:
+        size = float(size.split("M")[0])
+    except ValueError:
+        size = 0
+
+    return size
+
+
+def delete_folder(folder: str) -> int:
+    return subprocess.call(["rm", "-rf", folder])
+
+
+def control_folder_size(folder: str) -> int:
+    folder_size = check_folder_size(folder)
+
+    if folder_size > 500:
+        return delete_folder(folder)
 
 
 if __name__ == "__main__":

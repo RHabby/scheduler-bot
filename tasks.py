@@ -6,23 +6,27 @@ from celery.schedules import crontab
 import config
 import redis_worker as rw
 from tg_bot import checking_queue_len, send_with_file_id
+from utils import control_folder_size
 
 celery_app = Celery("tasks", broker="redis://localhost")
 
 celery_app.conf.beat_schedule = {
-    # executes every hour
-    "every_hour": {
-        "task": "send_from_queue",
-        "schedule": crontab(minute='*/30')
+    "send_telegram": {
+        "task": "send_telegram",
+        "schedule": crontab(minute='*/45')
     },
-    "every_ten_hours": {
-        "task": "check_queue_len",
-        "schedule": crontab(minute="1", hour="*/10")
+    "check_telegram_queue": {
+        "task": "check_telegram_queue",
+        "schedule": crontab(minute=0, hour="*/1")
+    },
+    "every_day": {
+        "task": "control_attach_folder_size",
+        "schedule": crontab(minute=0, hour=0)
     }
 }
 
 
-@celery_app.task(name="send_from_queue")
+@celery_app.task(name="send_telegram")
 def send_from_queue():
     file = rw.get_from_queue("queue")
     print(
@@ -44,6 +48,11 @@ def send_from_queue():
             )
 
 
-@celery_app.task(name="check_queue_len")
+@celery_app.task(name="check_telegram_queue")
 def check_queue_len():
     checking_queue_len()
+
+
+@celery_app.task(name="control_attach_folder_size")
+def control_attach_folder_size():
+    control_folder_size(folder=config.ATTACH_FOLDER)
