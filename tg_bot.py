@@ -297,7 +297,6 @@ def adding_subreddit_button(message: types.Message):
 @bot.message_handler(
     func=lambda message: rw.get_current_state(message.from_user.id) == States.DELETE_SUBREDDIT_STATE.value)
 def deleting_subreddit_button(message: types.Message):
-    print(rw.get_current_state(message.from_user.id))
     del_button = m.delete_button(
         id=message.chat.id,
         key="channels",
@@ -401,7 +400,6 @@ def callback_out_of_settings(call: types.CallbackQuery):
 @bot.callback_query_handler(func=lambda call: call.data == cs.ADD_SUBREDDIT)
 def add_subreddit_button(call: types.CallbackQuery):
     if call.message:
-        print(call.data)
         text = "What subreddit button would you like to add? Send me a text message."
         bot.send_message(
             chat_id=call.message.chat.id,

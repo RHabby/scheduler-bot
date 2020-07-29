@@ -1,3 +1,6 @@
+import logging
+import logging.config
+
 import flask
 from telebot import types
 
@@ -5,6 +8,9 @@ import config
 from tg_bot import bot
 
 app = flask.Flask(__name__)
+
+# logging.config.dictConfig(config=cs.dict_log_config)
+# logger = logging.getLogger("bot_logger")
 
 
 @app.route("/", methods=["GET", "HEAD"])
@@ -25,4 +31,5 @@ def webhook():
 
 
 if __name__ == "__main__":
+    logging.basicConfig(filename="./logs/flask_logs.log", level=logging.INFO)
     app.run(debug=True)
