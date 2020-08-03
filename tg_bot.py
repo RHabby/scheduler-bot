@@ -205,7 +205,8 @@ def process_sent_photo(message: types.Message):
         file_id=file_id,
         reply_markup=m.forward_to_channel_markup
     )
-
+    logger.info(f"User {message.chat.username}, ID: {message.chat.id}.\
+ Sent file[{message.content_type}], file_id[{file_id}]")
     bot.delete_message(
         chat_id=message.chat.id,
         message_id=message.message_id
@@ -428,6 +429,11 @@ def delete_subreddit_button(call: types.CallbackQuery):
 def send_reddit_photo(message: types.Message):
     try:
         args = rw.get_values(message.from_user.id)
+        logger.info(f'Command: /reddit. User {message.chat.username}\
+ ID: {message.chat.id}.\
+ Subreddit name: {args.get(b"subreddit_name").decode("utf-8")},\
+ sorting: {args.get(b"sorting").decode("utf-8")},\
+ count: {int(args.get(b"count").decode("utf-8"))}')
         send_simple(
             subreddit_name=args.get(b"subreddit_name").decode("utf-8"),
             submission_sort=args.get(b"sorting").decode("utf-8"),
@@ -439,11 +445,8 @@ def send_reddit_photo(message: types.Message):
             id=message.from_user.id,
             value=config.States.START_STATE.value
         )
-        logger.info(f'Command: /reddit. User {message.chat.username} \
-with ID: {message.chat.id}. \
-Subreddit name: {args.get(b"subreddit_name").decode("utf-8")}, \
-sorting: {args.get(b"sorting").decode("utf-8")}, \
-count: {int(args.get(b"count").decode("utf-8"))}')
+        logger.info(f'Command: /reddit. User {message.chat.username}\
+ ID: {message.chat.id}. Status: Done')
 
     except (Redirect, NotFound) as e:
         markup = m.generate_kboard(
@@ -458,11 +461,11 @@ count: {int(args.get(b"count").decode("utf-8"))}')
             parse_mode="markdown",
             disable_notification=True
         )
-        logger.info(f'{repr(e)}. Command: /reddit. User {message.chat.username} \
-ID: {message.chat.id}. \
-Subreddit name: {args.get(b"subreddit_name").decode("utf-8")}, \
-sorting: {args.get(b"sorting").decode("utf-8")}, \
-count: {int(args.get(b"count").decode("utf-8"))}')
+        logger.info(f'{repr(e)}. Command: /reddit. User {message.chat.username}\
+ ID: {message.chat.id}.\
+ Subreddit name: {args.get(b"subreddit_name").decode("utf-8")},\
+ sorting: {args.get(b"sorting").decode("utf-8")},\
+ count: {int(args.get(b"count").decode("utf-8"))}')
         rw.set_state(
             id=message.from_user.id,
             value=config.States.ENTER_SUBREDDIT_STATE.value
@@ -632,7 +635,17 @@ def checking_queue_len():
 
 @bot.message_handler(func=lambda message: True)
 def echo(message: types.Message):
-    bot.reply_to(message, message.text)
+    if message.json["entities"][0]["type"] == "url":
+        try:
+            send_from_insta(message.chat.id, message.text)
+            bot.delete_message(
+                chat_id=message.chat.id,
+                message_id=message.message_id
+            )
+        except Exception:
+            bot.reply_to(message, message.text)
+    else:
+        bot.reply_to(message, message.text)
 
 
 # @bot.callback_query_handler(func=lambda call: call.data == cs.ADD_WHERE_TO)
